@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>唐詩字卡拼拼樂 19.1 (私有手牌保護＋教室代碼版)</title>
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #4a3728;
+      --accent-color: #8b1e0f;
+      --bg-color: #f4efe2;
+      --card-bg: #fffdf9;
+      --card-border: #dcd0b4;
+      --text-color: #2b1f1d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: "PingFang TC", "Noto Serif TC", "Microsoft JhengHei", serif; }
+    body { background-color: var(--bg-color); color: var(--text-color); padding: 15px; }
+    h1, h2, h3 { text-align: center; color: var(--accent-color); margin-bottom: 10px; }
+
+    #role-selection { max-width: 500px; margin: 80px auto; padding: 30px; background: var(--card-bg); border: 2px solid var(--card-border); border-radius: 12px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .btn { background-color: var(--accent-color); color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 6px; cursor: pointer; transition: 0.3s; margin: 10px; font-weight: bold; }
+    .btn:hover { background-color: #631207; transform: translateY(-2px); }
+    .btn-secondary { background-color: #5c6370; }
+    .btn-secondary:hover { background-color: #4b515a; }
+    input { padding: 10px; font-size: 16px; border: 1px solid var(--card-border); border-radius: 6px; width: 80%; margin-bottom: 15px; text-align: center; }
+
+    .container { max-width: 1200px; margin: 0 auto; display: none; }
+    .status-panel { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 12px; margin-bottom: 15px; font-size: 15px; line-height: 1.6; }
+
+    .rhyme-filter-panel { background: #e8dfc7; border: 1px solid var(--card-border); border-radius: 8px; padding: 10px; margin-bottom: 15px; }
+    .rhyme-filter-title { font-size: 14px; font-weight: bold; margin-bottom: 8px; color: var(--primary-color); display: flex; justify-content: space-between; align-items: center; }
+    .rhyme-btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; }
+    .rhyme-filter-btn { background: var(--card-bg); border: 1px solid var(--card-border); padding: 6px 4px; font-size: 11px; border-radius: 4px; cursor: pointer; transition: 0.2s; text-align: center; }
+    .rhyme-filter-btn:hover { background: #fdf5e2; }
+    .rhyme-filter-btn.active { background: #f39c12; color: white; border-color: #d35400; font-weight: bold; }
+
+    .section-title { font-size: 16px; font-weight: bold; background: var(--primary-color); color: white; padding: 6px 12px; border-radius: 6px 6px 0 0; margin-top: 15px; display: flex; justify-content: space-between; align-items: center; }
+    .card-grid { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 0 0 6px 6px; min-height: 80px; align-content: flex-start; }
+
+    .word-card { background: #fff; border: 1px solid #ccc; border-radius: 6px; width: 44px; height: 44px; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; cursor: pointer; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: relative; transition: all 0.2s; }
+    .word-card:hover { transform: scale(1.08); box-shadow: 0 4px 8px rgba(0,0,0,0.15); border-color: var(--accent-color); }
+    .word-card.selected { border: 3px solid #007bff !important; background-color: #e6f2ff; }
+
+    .word-card.rhyme-highlight { border: 3px solid #f39c12 !important; box-shadow: 0 0 8px #f39c12; transform: scale(1.05); }
+
+    .word-card.phrase { width: auto; padding: 0 8px; border-radius: 12px; background-color: #fcf8e3; border-color: #fbeed5; }
+    .word-card.punctuation { background-color: #eef2f7; border-color: #ced4da; color: #495057; border-radius: 50%; }
+
+    .assembly-zone { min-height: 100px; border: 2px dashed var(--accent-color); background: #faf4e8 !important; border-radius: 0 0 6px 6px; }
+
+    .team-monitor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 15px; }
+    .team-monitor-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 12px; }
+    .team-monitor-cards { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; max-height: 120px; overflow-y: auto; padding: 4px; border: 1px inset #eee; background: #fafafa; }
+    .team-monitor-card-mini { font-size: 11px; padding: 2px 4px; border: 1px solid #ddd; background: #fff; border-radius: 3px; }
+
+    #buzzer-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); color: white; justify-content: center; align-items: center; flex-direction: column; z-index: 9999; }
+    #buzzer-title { font-size: 42px; font-weight: bold; color: #f39c12; margin-bottom: 20px; text-shadow: 0 0 10px #f39c12; }
+    #buzzer-poem { font-size: 28px; line-height: 1.8; margin-bottom: 30px; max-width: 80%; text-align: center; }
+
+    .punc-bar { display: flex; gap: 8px; padding: 10px; background: #eef2f7; border-radius: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .punc-btn { background: white; border: 1px solid #ced4da; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+    .punc-btn:hover { background: #e2e6ea; }
+  </style>
+</head>
+<body>
+
+  <h1>🏮 唐詩字卡拼拼樂 19.1 🏮</h1>
+  <h3 style="color:#555;">（私有手牌保護／教室代碼版）</h3>
+
+  <div id="role-selection">
+    <h3>請選擇您的角色</h3>
+    <button class="btn" onclick="initRole('teacher')">我是老師（建立房間）</button>
+    <button class="btn btn-secondary" onclick="initRole('student')">我是學生（輸入教室代碼加入）</button>
+    <div id="student-login" style="display:none; margin-top:20px; border-top:1px solid #ccc; padding-top:15px;">
+      <input type="text" id="room-code-input" placeholder="請輸入老師公布的教室代碼（如：K7X9PQ）" style="text-transform:uppercase;"><br>
+      <input type="text" id="team-name-input" placeholder="請輸入您的小組名稱（如：第一組）"><br>
+      <button class="btn" onclick="connectToTeacher()">確定加入</button>
+    </div>
+  </div>
+
+  <div id="main-container" class="container">
+    <div class="status-panel" id="status-info">載入中...</div>
+
+    <div class="rhyme-filter-panel">
+      <div class="rhyme-filter-title">
+        <span>🔍 中華新韻 14 韻快速檢索（點擊高亮場上同韻字）：</span>
+        <button onclick="clearRhymeFilter()" style="font-size:11px; padding:2px 6px; cursor:pointer;">清除高亮</button>
+      </div>
+      <div class="rhyme-btn-grid" id="rhyme-btn-grid"></div>
+    </div>
+
+    <div id="teacher-control" style="display:none;">
+      <div style="margin-bottom:15px;">
+        <button class="btn" onclick="distributeCards()">🎲 開始發牌/重置（公共150張/每組發滿80張）</button>
+        <button class="btn btn-secondary" onclick="resetGame()">🔄 徹底重設</button>
+      </div>
+      <div class="section-title">📊 已連線小組監控</div>
+      <div class="team-monitor-grid" id="team-monitor"></div>
+    </div>
+
+    <div id="student-control" style="display:none;">
+      <div style="margin-bottom:15px; display:flex; gap:10px;">
+        <button class="btn" onclick="requestNewWordDirectly()">💡 請求新字（直接加入共用市場）</button>
+        <button class="btn" style="background-color:#d9534f;" onclick="triggerBuzzer()">🔔 完成拼詩！搶答！</button>
+      </div>
+
+      <div class="section-title">
+        <span>🛒 班級共用字卡區 (點選字卡，再點手牌即可進行「以字換字」交易)</span>
+        <span id="market-count-badge" style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:10px; font-size:12px;">0</span>
+      </div>
+      <div class="card-grid" id="market-zone"></div>
+
+      <div class="section-title">
+        <span>🎒 你的私有字卡包</span>
+        <span id="hand-count-badge" style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:10px; font-size:12px;">0</span>
+      </div>
+      <div class="card-grid" id="hand-zone"></div>
+
+      <div class="punc-bar">
+        <span>➕ 標點符號：</span>
+        <button class="punc-btn" onclick="addPunctuation('，')">，</button>
+        <button class="punc-btn" onclick="addPunctuation('。')">。</button>
+        <button class="punc-btn" onclick="addPunctuation('？')">？</button>
+        <button class="punc-btn" onclick="addPunctuation('！')">！</button>
+        <button class="punc-btn" onclick="addPunctuation('、')">、</button>
+        <button class="punc-btn" onclick="addPunctuation('；')">；</button>
+        <button class="punc-btn" onclick="addPunctuation('「')">「</button>
+        <button class="punc-btn" onclick="addPunctuation('」')">」</button>
+      </div>
+
+      <div class="section-title">✍️ 古詩拼湊組裝區 (可左右拖曳字卡任意排序，點兩下字卡可收回至手牌)</div>
+      <div class="card-grid assembly-zone" id="assembly-zone"></div>
+    </div>
+  </div>
+
+  <div id="buzzer-overlay">
+    <div id="buzzer-title">🔔 搶答中！ 🔔</div>
+    <div style="font-size:20px; margin-bottom:10px;" id="buzzer-team-info"></div>
+    <div id="buzzer-poem"></div>
+    <div id="teacher-judgement" style="display:none;">
+      <button class="btn" style="background-color:#5cb85c;" onclick="judgeBuzzer(true)">✅ 判定正確</button>
+      <button class="btn" style="background-color:#d9534f;" onclick="judgeBuzzer(false)">❌ 判定錯誤（釋放搶答）</button>
+    </div>
+    <div id="student-waiting" style="display:none; font-size:18px; color:#aaa;">請等待老師進行判定...</div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. 中華新韻 14 韻核心字庫
+    // ==========================================
+    const rhymeGroups = {
+      MA: ["花", "家", "沙", "霞", "茶", "華", "涯", "鴉", "馬", "畫", "下", "巴", "紗", "誇", "雅", "斜", "佳", "笳", "發", "達"],
+      BO: ["波", "歌", "多", "荷", "坡", "河", "鵝", "蓑", "落", "昨", "蛾", "羅", "蘿", "漠", "酌", "泊", "莫", "托", "奪", "撥"],
+      JIE: ["皆", "街", "階", "葉", "夜", "野", "蝶", "謝", "寫", "別", "鐵", "貼", "月", "雪", "絕", "缺", "解", "且", "滅", "雀"],
+      KAI: ["開", "來", "懷", "柴", "苔", "臺", "栽", "猜", "哀", "排", "牌", "埋", "孩", "海", "買", "賣", "帥", "槐", "載", "腮"],
+      WEI: ["微", "飛", "歸", "輝", "梅", "眉", "吹", "垂", "水", "誰", "雷", "淚", "醉", "歲", "翠", "菲", "悲", "肥", "北", "美"],
+      HAO: ["豪", "高", "桃", "嬌", "橋", "蕭", "遙", "搖", "曉", "飄", "朝", "潮", "勞", "招", "照", "抱", "寶", "草", "刀", "老"],
+      YOU: ["尤", "舟", "秋", "愁", "流", "憂", "幽", "樓", "頭", "柳", "留", "游", "悠", "候", "走", "酒", "舊", "羞", "牛", "求"],
+      HAN: ["寒", "山", "閒", "關", "天", "船", "煙", "年", "殘", "泉", "邊", "眠", "蘭", "圓", "原", "遠", "暖", "怨", "難", "滿"],
+      WEN: ["心", "林", "琴", "金", "門", "塵", "魂", "深", "春", "雲", "君", "尋", "芬", "聞", "晨", "痕", "樽", "盆", "親", "鄰"],
+      TANG: ["唐", "堂", "鄉", "霜", "望", "香", "光", "陽", "涼", "江", "長", "狂", "牆", "航", "雙", "黃", "忙", "妝", "窗", "桑"],
+      GENG: ["聲", "風", "紅", "東", "同", "空", "鐘", "聽", "清", "明", "青", "情", "成", "城", "兵", "驚", "迎", "燈", "登", "冷"],
+      ZHI: ["時", "詩", "知", "日", "字", "詞", "此", "絲", "私", "師", "池", "遲", "枝", "拾", "事", "試", "指", "始", "紙", "芝"],
+      QI: ["齊", "西", "泥", "溪", "雞", "啼", "迷", "妻", "低", "魚", "雨", "語", "綠", "旅", "驢", "渠", "許", "去", "玉", "細"],
+      GU: ["姑", "孤", "獨", "枯", "無", "蘆", "湖", "途", "疏", "書", "出", "處", "暮", "渡", "珠", "朱", "扶", "夫", "初", "廬"]
+    };
+
+    const rhymeNames = {
+      MA: "一、麻 (a, ia)", BO: "二、波 (o, e)", JIE: "三、皆 (ie, üe)", KAI: "四、開 (ai, uai)",
+      WEI: "五、微 (ei, ui)", HAO: "六、豪 (ao, iao)", YOU: "七、尤 (ou, iu)", HAN: "八、寒 (an, ian)",
+      WEN: "九、文 (en, in)", TANG: "十、唐 (ang, iang)", GENG: "十一、庚 (eng, ing)", ZHI: "十二、支 (-i)",
+      QI: "十三、齊 (i, ü, er)", GU: "十四、姑 (u)"
+    };
+
+    // ==========================================
+    // 2. 詩詞輔助字庫
+    // ==========================================
+    const expandedFillers = [
+      "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "百", "千", "萬", "億", "半", "初", "暮", "朝", "夕", "晨", "夜", "晝", "旦", "宿", "宵", "歲", "時", "光陰", "歲月", "乾坤", "古今", "宇宙", "往來", "今日", "昨夜", "明朝", "幾度", "何時", "清晨",
+      "天", "地", "空", "霄", "雲", "霧", "煙", "霞", "風", "雨", "雪", "霜", "露", "冰", "泥", "沙", "石", "巖", "嶺", "峰", "岳", "谷", "壑", "澤", "潭", "瀑", "泉", "溪", "江", "河", "湖", "海", "潮", "汐", "波", "浪", "洲", "渚", "岸", "崖", "巒", "原", "野", "郊", "關", "塞", "塞外", "江南", "塞北", "西湖", "秦淮", "姑蘇", "長安", "洛陽", "故鄉", "家國", "萬里", "邊疆", "蓬萊",
+      "花", "草", "樹", "木", "林", "森", "枝", "葉", "根", "莖", "芽", "苞", "蕊", "松", "竹", "梅", "蘭", "菊", "荷", "蓮", "萍", "藻", "苔", "柳", "桃", "李", "杏", "楓", "桂", "梧", "桐", "蕉", "蓬", "蓽", "藤", "葛", "桑", "榆", "楊柳", "芭蕉", "芙蓉", "薔薇", "牡丹", "芍藥", "桂花",
+      "鳥", "獸", "蟲", "魚", "雁", "燕", "鶯", "鷺", "鶴", "鷗", "鵲", "鴉", "猿", "猴", "虎", "豹", "獅", "象", "馬", "牛", "羊", "犬", "雞", "雉", "鳳", "凰", "龍", "蛟", "鱗", "羽", "翼", "蟬", "蝶", "蜂", "螢", "蟻", "蛛", "蟹", "蟾", "兔", "孤雁", "寒蟬",
+      "宮", "殿", "樓", "閣", "臺", "榭", "門", "戶", "窗", "牖", "簾", "帷", "帳", "枕", "簟", "席", "几", "案", "鏡", "樽", "杯", "盞", "杓", "琴", "瑟", "笙", "簫", "笛", "鼓", "鐘", "磬", "棋", "局", "書", "畫", "筆", "墨", "紙", "硯", "劍", "刀", "鞍", "轡", "舟", "船", "櫂", "楫", "帆", "檣", "衣", "裳", "冠", "巾", "履", "鞋", "帶", "佩", "玉", "珠", "寶", "金", "銀", "青衫", "紅袖", "錦書", "瑤琴", "濁酒", "芳樽", "綠蟻",
+      "人", "君", "吾", "我", "爾", "汝", "彼", "此", "誰", "何", "伴", "侶", "友", "朋", "客", "賓", "翁", "嫗", "僧", "道", "尼", "儒", "仙", "佛", "子", "父", "母", "兄", "弟", "姐", "妹", "夫", "婦", "姝", "姬", "佳人", "故人", "征人", "遊子", "漁翁", "樵夫",
+      "行", "止", "坐", "臥", "起", "立", "登", "攀", "涉", "渡", "歸", "去", "來", "往", "尋", "覓", "訪", "逢", "見", "別", "送", "迎", "留", "待", "思", "想", "念", "憶", "懷", "盼", "望", "看", "聽", "聞", "問", "答", "言", "語", "吟", "詠", "歌", "舞", "吹", "彈", "酌", "飲", "醉", "醒", "眠", "宿", "夢", "覺", "憂", "愁", "悲", "歡", "離", "合", "聚", "散", "生", "死", "榮", "枯", "盛", "衰", "浮", "沉", "消", "長", "開", "落", "飛", "流", "逝", "徘徊", "迴首", "不可", "不知", "相思"
+    ];
+
+    const uniqueBase = Array.from(new Set([...Object.values(rhymeGroups).flat(), ...expandedFillers]));
+
+    // ==========================================
+    // 3. 教室代碼與連線狀態
+    // ==========================================
+    const ROOM_PREFIX = "poetry_room_";
+    let currentRoomCode = null;
+    let currentRoomId = null;
+
+    let peer = null;
+    let connMap = {};
+    let peerTeamMap = {};   // 老師端：peerId -> teamId
+    let myRole = '';
+    let myTeamId = '';
+    let currentSelectedMarketCard = null;
+    let activeRhymeFilter = null;
+    let studentView = null; // 學生端：只存放屬於自己那組的資料
+
+    let gameState = {
+      market: [],
+      deck: [],
+      teams: {},
+      buzzerActive: false,
+      buzzerWinner: null
+    };
+
+    function generateRoomCode(length = 6) {
+      const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (let i = 0; i < length; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    }
+
+    // ==========================================
+    // 4. 角色初始化
+    // ==========================================
+    function initRole(role) {
+      myRole = role;
+      document.getElementById('role-selection').style.display = 'none';
+      document.getElementById('main-container').style.display = 'block';
+      buildRhymeFilterUI();
+
+      if (role === 'teacher') {
+        document.getElementById('teacher-control').style.display = 'block';
+        document.getElementById('status-info').innerText = "正在建立課堂連線通道...";
+        createTeacherRoom(0);
+      } else {
+        document.getElementById('student-login').style.display = 'block';
+        document.getElementById('role-selection').style.display = 'block';
+      }
+    }
+
+    function createTeacherRoom(attempt) {
+      if (attempt >= 5) {
+        document.getElementById('status-info').innerHTML = `❌ 多次嘗試建立教室代碼皆失敗，請重新整理頁面再試一次。`;
+        return;
+      }
+
+      currentRoomCode = generateRoomCode();
+      currentRoomId = ROOM_PREFIX + currentRoomCode;
+
+      peer = new Peer(currentRoomId);
+
+      peer.on('open', () => {
+        document.getElementById('status-info').innerHTML = `
+          🏫 <strong>課堂通道已開啟！</strong><br>
+          請將以下「教室代碼」公布給學生：<br>
+          <div style="font-size:32px; font-weight:bold; color:var(--accent-color); letter-spacing:4px; margin:10px 0;">${currentRoomCode}</div>
+          等待學生連線中... (目前字庫總字數：<strong>${uniqueBase.length}字</strong>)
+        `;
+      });
+
+      peer.on('connection', (conn) => {
+        handlePeerConnection(conn);
+      });
+
+      peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') {
+          console.log(`教室代碼 ${currentRoomCode} 恰好撞名，重新產生新代碼...`);
+          peer.destroy();
+          createTeacherRoom(attempt + 1);
+        } else {
+          console.error(err);
+        }
+      });
+    }
+
+    function handlePeerConnection(conn) {
+      conn.on('data', (data) => {
+        handleMessageFromStudent(conn, data);
+      });
+      conn.on('close', () => {
+        removeTeam(conn.peer);
+      });
+    }
+
+    function connectToTeacher() {
+      const roomCode = document.getElementById('room-code-input').value.trim().toUpperCase();
+      const teamName = document.getElementById('team-name-input').value.trim();
+
+      if (!roomCode) {
+        alert("請輸入老師公布的教室代碼！");
+        return;
+      }
+      if (!teamName) {
+        alert("請輸入您的小組名稱（如：第一組）！");
+        return;
+      }
+
+      myTeamId = teamName;
+      const targetRoomId = ROOM_PREFIX + roomCode;
+
+      document.getElementById('student-login').style.display = 'none';
+      document.getElementById('role-selection').style.display = 'none';
+      document.getElementById('status-info').innerText = "正在連線至教室...";
+
+      peer = new Peer();
+      peer.on('open', () => {
+        const conn = peer.connect(targetRoomId);
+        connMap[targetRoomId] = conn;
+
+        conn.on('open', () => {
+          conn.send({ type: 'REGISTER', teamId: myTeamId });
+          document.getElementById('student-control').style.display = 'block';
+          document.getElementById('status-info').innerHTML = `✅ 已成功加入教室！您的團隊：<strong>${myTeamId}</strong>`;
+        });
+
+        conn.on('data', (data) => {
+          if (data.type === 'SYNC') {
+            studentView = data.view;
+            updateStudentUI();
+          }
+        });
+
+        conn.on('error', () => {
+          document.getElementById('status-info').innerHTML = `
+            ❌ 連線失敗，請確認教室代碼是否輸入正確，以及老師端是否已經開啟教室。<br>
+            <button class="btn btn-secondary" onclick="location.reload()">重新整理並再試一次</button>
+          `;
+        });
+      });
+    }
+
+    // ==========================================
+    // 5. 14 韻高亮
+    // ==========================================
+    function buildRhymeFilterUI() {
+      const grid = document.getElementById('rhyme-btn-grid');
+      grid.innerHTML = '';
+      for (let key in rhymeGroups) {
+        const btn = document.createElement('button');
+        btn.className = 'rhyme-filter-btn';
+        btn.id = `rhyme-btn-${key}`;
+        btn.innerText = rhymeNames[key];
+        btn.onclick = () => toggleRhymeFilter(key);
+        grid.appendChild(btn);
+      }
+    }
+
+    function toggleRhymeFilter(rhymeKey) {
+      if (activeRhymeFilter === rhymeKey) {
+        clearRhymeFilter();
+      } else {
+        activeRhymeFilter = rhymeKey;
+        document.querySelectorAll('.rhyme-filter-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`rhyme-btn-${rhymeKey}`).classList.add('active');
+        applyRhymeHighlight();
+      }
+    }
+
+    function clearRhymeFilter() {
+      activeRhymeFilter = null;
+      document.querySelectorAll('.rhyme-filter-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.word-card').forEach(card => card.classList.remove('rhyme-highlight'));
+    }
+
+    function applyRhymeHighlight() {
+      if (!activeRhymeFilter) return;
+      const targetWords = rhymeGroups[activeRhymeFilter];
+      document.querySelectorAll('.word-card').forEach(card => {
+        const cardText = card.dataset.text;
+        if (targetWords.includes(cardText)) {
+          card.classList.add('rhyme-highlight');
+        } else {
+          card.classList.remove('rhyme-highlight');
+        }
+      });
+    }
+
+    // ==========================================
+    // 6. 老師控制與發牌邏輯
+    // ==========================================
+    function distributeCards() {
+      if (Object.keys(connMap).length === 0) {
+        alert("目前還沒有任何小組連線進來喔！");
+        return;
+      }
+
+      let deck = [...uniqueBase];
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+
+      gameState.market = deck.splice(0, 150);
+
+      for (let teamId in gameState.teams) {
+        gameState.teams[teamId].hand = deck.splice(0, 80);
+        gameState.teams[teamId].assembly = [];
+      }
+
+      gameState.deck = deck;
+      gameState.buzzerActive = false;
+      gameState.buzzerWinner = null;
+
+      broadcastState();
+      updateTeacherUI();
+    }
+
+    function resetGame() {
+      if (!confirm("確定要重設整場遊戲嗎？所有狀態都會歸零。")) return;
+      gameState.market = [];
+      gameState.deck = [];
+      gameState.buzzerActive = false;
+      gameState.buzzerWinner = null;
+      for (let t in gameState.teams) {
+        gameState.teams[t].hand = [];
+        gameState.teams[t].assembly = [];
+      }
+      broadcastState();
+      updateTeacherUI();
+    }
+
+    // 修正一：不再整包廣播 gameState，改成逐一組裝各組專屬的個人化視圖
+    function buildStudentView(teamId) {
+      const team = gameState.teams[teamId] || { hand: [], assembly: [] };
+      const view = {
+        market: gameState.market,
+        deckCount: gameState.deck.length,
+        buzzerActive: gameState.buzzerActive,
+        buzzerWinner: gameState.buzzerWinner,
+        myHand: team.hand,
+        myAssembly: team.assembly,
+        buzzerPoem: null
+      };
+      if (gameState.buzzerActive && gameState.teams[gameState.buzzerWinner]) {
+        view.buzzerPoem = gameState.teams[gameState.buzzerWinner].assembly.map(x => x.text).join('');
+      }
+      return view;
+    }
+
+    function broadcastState() {
+      for (let peerId in connMap) {
+        const teamId = peerTeamMap[peerId];
+        if (!teamId) continue;
+        connMap[peerId].send({ type: 'SYNC', view: buildStudentView(teamId) });
+      }
+    }
+
+    // ==========================================
+    // 7. 學生請求新字與交易邏輯
+    // ==========================================
+    function handleMessageFromStudent(conn, data) {
+      const teamId = data.teamId;
+
+      if (data.type === 'REGISTER') {
+        connMap[conn.peer] = conn;
+        peerTeamMap[conn.peer] = teamId;
+        if (!gameState.teams[teamId]) {
+          gameState.teams[teamId] = { hand: [], assembly: [] };
+        }
+        broadcastState();
+        updateTeacherUI();
+      }
+      else if (data.type === 'TRADE') {
+        const { marketIdx, handIdx } = data;
+        const marketWord = gameState.market[marketIdx];
+        const handWord = gameState.teams[teamId].hand[handIdx];
+
+        gameState.market[marketIdx] = handWord;
+        gameState.teams[teamId].hand[handIdx] = marketWord;
+
+        broadcastState();
+        updateTeacherUI();
+      }
+      else if (data.type === 'REQUEST_NEW_DIRECT') {
+        let allInPlay = new Set([
+          ...gameState.market,
+          ...Object.values(gameState.teams).flatMap(t => [...t.hand, ...t.assembly])
+        ]);
+
+        let newCard = null;
+        if (gameState.deck.length > 0) {
+          for (let i = 0; i < gameState.deck.length; i++) {
+            if (!allInPlay.has(gameState.deck[i])) {
+              newCard = gameState.deck.splice(i, 1)[0];
+              break;
+            }
+          }
+          if (!newCard) newCard = gameState.deck.shift();
+        } else {
+          newCard = expandedFillers.find(f => !allInPlay.has(f)) || expandedFillers[Math.floor(Math.random() * expandedFillers.length)];
+        }
+
+        if (newCard) {
+          gameState.market.push(newCard);
+          broadcastState();
+          updateTeacherUI();
+        }
+      }
+      else if (data.type === 'BUZZER') {
+        if (!gameState.buzzerActive) {
+          gameState.buzzerActive = true;
+          gameState.buzzerWinner = teamId;
+          broadcastState();
+          updateTeacherUI();
+        }
+      }
+      else if (data.type === 'UPDATE_ASSEMBLY') {
+        if (gameState.teams[teamId]) {
+          gameState.teams[teamId].assembly = data.assembly;
+          gameState.teams[teamId].hand = data.hand;
+          broadcastState();
+          updateTeacherUI();
+        }
+      }
+    }
+
+    function removeTeam(peerId) {
+      delete connMap[peerId];
+      delete peerTeamMap[peerId];
+      updateTeacherUI();
+    }
+
+    // ==========================================
+    // 8. 畫面 UI 渲染
+    // ==========================================
+    function createCardElement(text, isPunctuation = false) {
+      const card = document.createElement('div');
+      card.className = 'word-card';
+      card.dataset.text = text;
+
+      if (isPunctuation) {
+        card.classList.add('punctuation');
+        card.innerText = text;
+      } else {
+        card.innerText = text;
+        if (text.length > 1) {
+          card.classList.add('phrase');
+        }
+      }
+      return card;
+    }
+
+    function updateTeacherUI() {
+      const infoPanel = document.getElementById('status-info');
+      infoPanel.innerHTML = `
+        👨‍🏫 <strong>老師控制台</strong> | 教室代碼：<strong>${currentRoomCode || '產生中...'}</strong> 
+        | 已連接小組數：<strong>${Object.keys(connMap).length}</strong> 
+        | 剩餘隱藏字庫：<strong>${gameState.deck ? gameState.deck.length : 0}張</strong>
+      `;
+
+      const monitor = document.getElementById('team-monitor');
+      monitor.innerHTML = '';
+
+      for (let tId in gameState.teams) {
+        const team = gameState.teams[tId];
+        const card = document.createElement('div');
+        card.className = 'team-monitor-card';
+        card.innerHTML = `
+          <strong>👥 ${tId}</strong> (手牌：${team.hand.length}張)<br>
+          <div style="font-size: 13px; color:#555; margin-top:5px;">拼詩中：</div>
+          <div style="font-size: 16px; font-weight:bold; color:var(--accent-color); margin: 5px 0;">
+            ${team.assembly.map(x => x.text).join('') || '（尚未動筆）'}
+          </div>
+        `;
+
+        const cardsMini = document.createElement('div');
+        cardsMini.className = 'team-monitor-cards';
+        team.hand.forEach(w => {
+          const mini = document.createElement('span');
+          mini.className = 'team-monitor-card-mini';
+          mini.innerText = w;
+          cardsMini.appendChild(mini);
+        });
+        card.appendChild(cardsMini);
+        monitor.appendChild(card);
+      }
+
+      handleBuzzerState();
+    }
+
+    // 修正一：學生端 UI 只讀取 studentView，不再持有全班的 gameState
+    function updateStudentUI() {
+      if (!studentView) return;
+
+      document.getElementById('market-count-badge').innerText = `${studentView.market.length}張`;
+      document.getElementById('hand-count-badge').innerText = `${studentView.myHand.length}張`;
+
+      const mZone = document.getElementById('market-zone');
+      mZone.innerHTML = '';
+      studentView.market.forEach((word, idx) => {
+        const card = createCardElement(word);
+        if (currentSelectedMarketCard && currentSelectedMarketCard.index === idx) {
+          card.classList.add('selected');
+        }
+        card.onclick = () => selectMarketCard(idx, card);
+        mZone.appendChild(card);
+      });
+
+      const hZone = document.getElementById('hand-zone');
+      hZone.innerHTML = '';
+      studentView.myHand.forEach((word, idx) => {
+        const card = createCardElement(word);
+        card.onclick = () => selectHandCard(idx);
+        card.ondblclick = () => moveToAssembly(idx);
+        hZone.appendChild(card);
+      });
+
+      const aZone = document.getElementById('assembly-zone');
+      aZone.innerHTML = '';
+      studentView.myAssembly.forEach((cardObj, idx) => {
+        const card = createCardElement(cardObj.text, cardObj.isPunc);
+        card.dataset.id = cardObj.id;
+        card.ondblclick = () => returnToHand(idx);
+        aZone.appendChild(card);
+      });
+
+      applyRhymeHighlight();
+
+      if (!aZone.sortableInstance) {
+        aZone.sortableInstance = new Sortable(aZone, {
+          animation: 150,
+          onEnd: function () {
+            const newOrder = [];
+            aZone.querySelectorAll('.word-card').forEach(el => {
+              newOrder.push({ id: el.dataset.id, text: el.dataset.text, isPunc: el.classList.contains('punctuation') });
+            });
+            studentView.myAssembly = newOrder;
+            sendAssemblyUpdate();
+          }
+        });
+      }
+
+      handleBuzzerState();
+    }
+
+    // ==========================================
+    // 9. 拼詩與拖曳交易細節
+    // ==========================================
+    function selectMarketCard(idx, element) {
+      if (currentSelectedMarketCard && currentSelectedMarketCard.index === idx) {
+        currentSelectedMarketCard = null;
+        element.classList.remove('selected');
+      } else {
+        currentSelectedMarketCard = { index: idx };
+        updateStudentUI();
+      }
+    }
+
+    function selectHandCard(handIdx) {
+      if (currentSelectedMarketCard !== null) {
+        const marketIdx = currentSelectedMarketCard.index;
+        const conn = connMap[Object.keys(connMap)[0]];
+        if (conn) {
+          conn.send({
+            type: 'TRADE',
+            teamId: myTeamId,
+            marketIdx: marketIdx,
+            handIdx: handIdx
+          });
+        }
+        currentSelectedMarketCard = null;
+      }
+    }
+
+    function requestNewWordDirectly() {
+      const conn = connMap[Object.keys(connMap)[0]];
+      if (conn) {
+        conn.send({ type: 'REQUEST_NEW_DIRECT', teamId: myTeamId });
+      }
+    }
+
+    function moveToAssembly(handIdx) {
+      const word = studentView.myHand.splice(handIdx, 1)[0];
+      const uniqueId = 'card_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+      studentView.myAssembly.push({ id: uniqueId, text: word, isPunc: false });
+      sendAssemblyUpdate();
+    }
+
+    function returnToHand(assemblyIdx) {
+      const cardObj = studentView.myAssembly.splice(assemblyIdx, 1)[0];
+      if (!cardObj.isPunc) {
+        studentView.myHand.push(cardObj.text);
+      }
+      sendAssemblyUpdate();
+    }
+
+    function addPunctuation(punc) {
+      const uniqueId = 'punc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+      studentView.myAssembly.push({ id: uniqueId, text: punc, isPunc: true });
+      sendAssemblyUpdate();
+    }
+
+    function sendAssemblyUpdate() {
+      const conn = connMap[Object.keys(connMap)[0]];
+      if (conn) {
+        conn.send({
+          type: 'UPDATE_ASSEMBLY',
+          teamId: myTeamId,
+          assembly: studentView.myAssembly,
+          hand: studentView.myHand
+        });
+      }
+      updateStudentUI();
+    }
+
+    function triggerBuzzer() {
+      const conn = connMap[Object.keys(connMap)[0]];
+      if (conn) {
+        conn.send({ type: 'BUZZER', teamId: myTeamId });
+      }
+    }
+
+    function handleBuzzerState() {
+      const overlay = document.getElementById('buzzer-overlay');
+      const isActive = myRole === 'teacher' ? gameState.buzzerActive : (studentView && studentView.buzzerActive);
+
+      if (isActive) {
+        overlay.style.display = 'flex';
+        if (myRole === 'teacher') {
+          document.getElementById('buzzer-team-info').innerHTML = `🎉 搶答組別：<strong>${gameState.buzzerWinner}</strong> 🎉`;
+          const winnerTeam = gameState.teams[gameState.buzzerWinner];
+          document.getElementById('buzzer-poem').innerText = winnerTeam ? winnerTeam.assembly.map(x => x.text).join('') : '';
+          document.getElementById('teacher-judgement').style.display = 'block';
+          document.getElementById('student-waiting').style.display = 'none';
+        } else {
+          document.getElementById('buzzer-team-info').innerHTML = `🎉 搶答組別：<strong>${studentView.buzzerWinner || '???'}</strong> 🎉`;
+          document.getElementById('buzzer-poem').innerText = studentView.buzzerPoem || '';
+          document.getElementById('teacher-judgement').style.display = 'none';
+          document.getElementById('student-waiting').style.display = 'block';
+        }
+      } else {
+        overlay.style.display = 'none';
+      }
+    }
+
+    function judgeBuzzer(success) {
+      if (success) {
+        alert(`恭喜 ${gameState.buzzerWinner} 挑戰成功！🎉`);
+      } else {
+        alert("判定不正確，釋放搶答權，繼續遊戲！");
+      }
+      gameState.buzzerActive = false;
+      gameState.buzzerWinner = null;
+      broadcastState();
+      updateTeacherUI();
+    }
+  </script>
+</body>
+</html>
