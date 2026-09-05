@@ -38,6 +38,22 @@
 
     .section-title { font-size: 16px; font-weight: bold; background: var(--primary-color); color: white; padding: 6px 12px; border-radius: 6px 6px 0 0; margin-top: 15px; display: flex; justify-content: space-between; align-items: center; }
     .card-grid { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 0 0 6px 6px; min-height: 80px; align-content: flex-start; }
+    @media (max-width: 480px) {
+  .card-grid {
+    max-height: 200px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 1024px) {
+  .card-grid {
+    max-height: 320px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 
     .word-card { background: #fff; border: 1px solid #ccc; border-radius: 6px; width: 44px; height: 44px; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; cursor: pointer; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: relative; transition: all 0.2s; }
     .word-card:hover { transform: scale(1.08); box-shadow: 0 4px 8px rgba(0,0,0,0.15); border-color: var(--accent-color); }
