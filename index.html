@@ -78,14 +78,14 @@
     .punc-bar { display: flex; gap: 8px; padding: 10px; background: #eef2f7; border-radius: 6px; margin-top: 10px; flex-wrap: wrap; }
     .punc-btn { background: white; border: 1px solid #ced4da; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
     .punc-btn:hover { background: #e2e6ea; }
-        .result-overlay { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; }
+
+    .result-overlay { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; }
     .result-overlay.success { background: rgba(255,215,0,0.35); backdrop-filter: blur(4px); }
     .result-overlay.fail { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
     .result-box { background: #fff; border-radius: 16px; padding: 32px 24px; text-align: center; max-width: 320px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
     .result-icon { font-size: 64px; margin-bottom: 12px; }
     .result-overlay.success h1 { color: #d97706; margin: 8px 0; }
     .result-overlay.fail h1 { color: #dc2626; margin: 8px 0; }
-
   </style>
 </head>
 <body>
@@ -228,10 +228,11 @@
     let currentSelectedMarketCard = null;
     let activeRhymeFilter = null;
     let studentView = null; // 學生端：只存放屬於自己那組的資料
+
     let reconnectAttempts = 0;
-let pendingRestoreData = null;
-let saveTimer = null;
-const SAVE_KEY = 'pg_teacher_save_191';
+    let pendingRestoreData = null;
+    let saveTimer = null;
+    const SAVE_KEY = 'pg_teacher_save_191';
 
     let gameState = {
       market: [],
@@ -259,17 +260,15 @@ const SAVE_KEY = 'pg_teacher_save_191';
       document.getElementById('main-container').style.display = 'block';
       buildRhymeFilterUI();
 
-    if (role === 'teacher') {
-  document.getElementById('teacher-control').style.display = 'block';
-  const saved = readSavedState();
-  if (saved && saved.gameState && Object.keys(saved.gameState.teams || {}).length > 0) {
-    showRestoreBanner(saved);
-  } else {
-    document.getElementById('status-info').innerText = "正在建立課堂連線通道...";
-    createTeacherRoom(0);
-  }
-
-
+      if (role === 'teacher') {
+        document.getElementById('teacher-control').style.display = 'block';
+        const saved = readSavedState();
+        if (saved && saved.gameState && Object.keys(saved.gameState.teams || {}).length > 0) {
+          showRestoreBanner(saved);
+        } else {
+          document.getElementById('status-info').innerText = "正在建立課堂連線通道...";
+          createTeacherRoom(0);
+        }
       } else {
         document.getElementById('student-login').style.display = 'block';
         document.getElementById('role-selection').style.display = 'block';
@@ -282,7 +281,7 @@ const SAVE_KEY = 'pg_teacher_save_191';
         return;
       }
 
-      currentRoomCode = generateRoomCode();
+      currentRoomCode = fixedCode || generateRoomCode();
       currentRoomId = ROOM_PREFIX + currentRoomCode;
 
       peer = new Peer(currentRoomId);
@@ -310,52 +309,6 @@ const SAVE_KEY = 'pg_teacher_save_191';
         }
       });
     }
-function saveState() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({
-        roomCode: currentRoomCode,
-        at: Date.now(),
-        gameState: gameState
-      }));
-    } catch (e) {}
-  }, 400);
-}
-
-function readSavedState() {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) { return null; }
-}
-
-function showRestoreBanner(saved) {
-  pendingRestoreData = saved;
-  const teamCount = Object.keys(saved.gameState.teams || {}).length;
-  const minutesAgo = Math.max(0, Math.round((Date.now() - saved.at) / 60000));
-  document.getElementById('status-info').innerHTML = `
-    🔄 偵測到約 ${minutesAgo} 分鐘前的課程紀錄（共 ${teamCount} 組，教室代碼：${saved.roomCode}）。<br>
-    <button class="btn" onclick="restoreSavedState()">還原上次課程</button>
-    <button class="btn btn-secondary" onclick="startFreshTeacher()">開新課程（清除紀錄）</button>
-  `;
-}
-
-function restoreSavedState() {
-  if (!pendingRestoreData) return;
-  gameState = pendingRestoreData.gameState;
-  const fixedCode = pendingRestoreData.roomCode;
-  pendingRestoreData = null;
-  document.getElementById('status-info').innerText = "正在以原教室代碼重新建立連線...";
-  createTeacherRoom(0, fixedCode);
-}
-
-function startFreshTeacher() {
-  localStorage.removeItem(SAVE_KEY);
-  pendingRestoreData = null;
-  document.getElementById('status-info').innerText = "正在建立課堂連線通道...";
-  createTeacherRoom(0);
-}
 
     function handlePeerConnection(conn) {
       conn.on('data', (data) => {
@@ -366,87 +319,71 @@ function startFreshTeacher() {
       });
     }
 
+    // ==========================================
+    // 4b. 老師端狀態保存與還原
+    // ==========================================
+    function saveState() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        try {
+          localStorage.setItem(SAVE_KEY, JSON.stringify({
+            roomCode: currentRoomCode,
+            at: Date.now(),
+            gameState: gameState
+          }));
+        } catch (e) {}
+      }, 400);
+    }
+
+    function readSavedState() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; }
+    }
+
+    function showRestoreBanner(saved) {
+      pendingRestoreData = saved;
+      const teamCount = Object.keys(saved.gameState.teams || {}).length;
+      const minutesAgo = Math.max(0, Math.round((Date.now() - saved.at) / 60000));
+      document.getElementById('status-info').innerHTML = `
+        🔄 偵測到約 ${minutesAgo} 分鐘前的課程紀錄（共 ${teamCount} 組，教室代碼：${saved.roomCode}）。<br>
+        <button class="btn" onclick="restoreSavedState()">還原上次課程</button>
+        <button class="btn btn-secondary" onclick="startFreshTeacher()">開新課程（清除紀錄）</button>
+      `;
+    }
+
+    function restoreSavedState() {
+      if (!pendingRestoreData) return;
+      gameState = pendingRestoreData.gameState;
+      const fixedCode = pendingRestoreData.roomCode;
+      pendingRestoreData = null;
+      document.getElementById('status-info').innerText = "正在以原教室代碼重新建立連線...";
+      createTeacherRoom(0, fixedCode);
+    }
+
+    function startFreshTeacher() {
+      localStorage.removeItem(SAVE_KEY);
+      pendingRestoreData = null;
+      document.getElementById('status-info').innerText = "正在建立課堂連線通道...";
+      createTeacherRoom(0);
+    }
+
+    // ==========================================
+    // 4c. 學生端連線與自動重連
+    // ==========================================
     function connectToTeacher() {
-  const roomCode = document.getElementById('room-code-input').value.trim().toUpperCase();
-  const teamName = document.getElementById('team-name-input').value.trim();
+      const roomCode = document.getElementById('room-code-input').value.trim().toUpperCase();
+      const teamName = document.getElementById('team-name-input').value.trim();
 
-  if (!roomCode) {
-    alert("請輸入老師公布的教室代碼！");
-    return;
-  }
-  if (!teamName) {
-    alert("請輸入您的小組名稱（如：第一組）！");
-    return;
-  }
-
-  myTeamId = teamName;
-  const targetRoomId = ROOM_PREFIX + roomCode;
-
-  document.getElementById('student-login').style.display = 'none';
-  document.getElementById('role-selection').style.display = 'none';
-  document.getElementById('status-info').innerText = "正在連線至教室...";
-
-  peer = new Peer();
-  peer.on('open', () => {
-    openStudentConnection(targetRoomId);
-  });
-  peer.on('error', (err) => {
-    document.getElementById('status-info').innerHTML = `❌ 連線發生錯誤（${err.type}），請確認教室代碼是否正確。`;
-  });
-}
-
-function openStudentConnection(targetRoomId) {
-  const conn = peer.connect(targetRoomId);
-  connMap[targetRoomId] = conn;
-
-  conn.on('open', () => {
-    reconnectAttempts = 0;
-    conn.send({ type: 'REGISTER', teamId: myTeamId });
-    document.getElementById('student-control').style.display = 'block';
-    document.getElementById('status-info').innerHTML = `✅ 已成功加入教室！您的團隊：<strong>${myTeamId}</strong>`;
-  });
-
-  conn.on('data', (data) => {
-    if (data.type === 'SYNC') {
-      studentView = data.view;
-      updateStudentUI();
-    } else if (data.type === 'LEVEL_RESULT') {
-      showResultOverlay(data.passed);
-    }
-  });
-
-  conn.on('close', () => {
-    document.getElementById('status-info').innerHTML = `⚠️ 與老師的連線中斷，正在嘗試重新連線…`;
-    scheduleReconnect(targetRoomId);
-  });
-
-  conn.on('error', () => {
-    document.getElementById('status-info').innerHTML = `⚠️ 連線發生錯誤，正在嘗試重新連線…`;
-    scheduleReconnect(targetRoomId);
-  });
-}
-
-function scheduleReconnect(targetRoomId) {
-  if (reconnectAttempts >= 12) {
-    document.getElementById('status-info').innerHTML = `
-      ❌ 多次嘗試重新連線皆失敗，請手動重新整理頁面。<br>
-      <button class="btn btn-secondary" onclick="location.reload()">重新整理</button>
-    `;
-    return;
-  }
-  reconnectAttempts++;
-  document.getElementById('status-info').innerHTML = `⏳ 正在重新連線...（第 ${reconnectAttempts} 次嘗試）`;
-  const delay = Math.min(1500 * reconnectAttempts, 8000);
-  setTimeout(() => {
-    if (peer.disconnected) {
-      peer.reconnect();
-      peer.once('open', () => openStudentConnection(targetRoomId));
-    } else {
-      openStudentConnection(targetRoomId);
-    }
-  }, delay);
-}
-
+      if (!roomCode) {
+        alert("請輸入老師公布的教室代碼！");
+        return;
+      }
+      if (!teamName) {
+        alert("請輸入您的小組名稱（如：第一組）！");
+        return;
+      }
 
       myTeamId = teamName;
       const targetRoomId = ROOM_PREFIX + roomCode;
@@ -457,29 +394,63 @@ function scheduleReconnect(targetRoomId) {
 
       peer = new Peer();
       peer.on('open', () => {
-        const conn = peer.connect(targetRoomId);
-        connMap[targetRoomId] = conn;
-
-        conn.on('open', () => {
-          conn.send({ type: 'REGISTER', teamId: myTeamId });
-          document.getElementById('student-control').style.display = 'block';
-          document.getElementById('status-info').innerHTML = `✅ 已成功加入教室！您的團隊：<strong>${myTeamId}</strong>`;
-        });
-
-        conn.on('data', (data) => {
-          if (data.type === 'SYNC') {
-            studentView = data.view;
-            updateStudentUI();
-          }
-        });
-
-        conn.on('error', () => {
-          document.getElementById('status-info').innerHTML = `
-            ❌ 連線失敗，請確認教室代碼是否輸入正確，以及老師端是否已經開啟教室。<br>
-            <button class="btn btn-secondary" onclick="location.reload()">重新整理並再試一次</button>
-          `;
-        });
+        openStudentConnection(targetRoomId);
       });
+      peer.on('error', (err) => {
+        document.getElementById('status-info').innerHTML = `❌ 連線發生錯誤（${err.type}），請確認教室代碼是否正確。`;
+      });
+    }
+
+    function openStudentConnection(targetRoomId) {
+      const conn = peer.connect(targetRoomId);
+      connMap[targetRoomId] = conn;
+
+      conn.on('open', () => {
+        reconnectAttempts = 0;
+        conn.send({ type: 'REGISTER', teamId: myTeamId });
+        document.getElementById('student-control').style.display = 'block';
+        document.getElementById('status-info').innerHTML = `✅ 已成功加入教室！您的團隊：<strong>${myTeamId}</strong>`;
+      });
+
+      conn.on('data', (data) => {
+        if (data.type === 'SYNC') {
+          studentView = data.view;
+          updateStudentUI();
+        } else if (data.type === 'LEVEL_RESULT') {
+          showResultOverlay(data.passed);
+        }
+      });
+
+      conn.on('close', () => {
+        document.getElementById('status-info').innerHTML = `⚠️ 與老師的連線中斷，正在嘗試重新連線…`;
+        scheduleReconnect(targetRoomId);
+      });
+
+      conn.on('error', () => {
+        document.getElementById('status-info').innerHTML = `⚠️ 連線發生錯誤，正在嘗試重新連線…`;
+        scheduleReconnect(targetRoomId);
+      });
+    }
+
+    function scheduleReconnect(targetRoomId) {
+      if (reconnectAttempts >= 12) {
+        document.getElementById('status-info').innerHTML = `
+          ❌ 多次嘗試重新連線皆失敗，請手動重新整理頁面。<br>
+          <button class="btn btn-secondary" onclick="location.reload()">重新整理</button>
+        `;
+        return;
+      }
+      reconnectAttempts++;
+      document.getElementById('status-info').innerHTML = `⏳ 正在重新連線...（第 ${reconnectAttempts} 次嘗試）`;
+      const delay = Math.min(1500 * reconnectAttempts, 8000);
+      setTimeout(() => {
+        if (peer.disconnected) {
+          peer.reconnect();
+          peer.once('open', () => openStudentConnection(targetRoomId));
+        } else {
+          openStudentConnection(targetRoomId);
+        }
+      }, delay);
     }
 
     // ==========================================
@@ -591,7 +562,7 @@ function scheduleReconnect(targetRoomId) {
     }
 
     function broadcastState() {
-        saveState();
+      saveState();
       for (let peerId in connMap) {
         const teamId = peerTeamMap[peerId];
         if (!teamId) continue;
@@ -887,58 +858,61 @@ function scheduleReconnect(targetRoomId) {
       }
     }
 
-  function judgeBuzzer(success) {
-  const winnerTeamId = gameState.buzzerWinner;
+    function judgeBuzzer(success) {
+      const winnerTeamId = gameState.buzzerWinner;
 
-  const winnerPeerId = Object.keys(peerTeamMap).find(pid => peerTeamMap[pid] === winnerTeamId);
-  if (winnerPeerId && connMap[winnerPeerId]) {
-    try {
-      connMap[winnerPeerId].send({ type: 'LEVEL_RESULT', passed: success, teamId: winnerTeamId });
-    } catch (e) {}
-  }
+      const winnerPeerId = Object.keys(peerTeamMap).find(pid => peerTeamMap[pid] === winnerTeamId);
+      if (winnerPeerId && connMap[winnerPeerId]) {
+        try {
+          connMap[winnerPeerId].send({ type: 'LEVEL_RESULT', passed: success, teamId: winnerTeamId });
+        } catch (e) {}
+      }
 
-  if (success) {
-    alert(`恭喜 ${winnerTeamId} 挑戰成功！🎉`);
-  } else {
-    alert("判定不正確，釋放搶答權，繼續遊戲！");
-  }
+      if (success) {
+        alert(`恭喜 ${winnerTeamId} 挑戰成功！🎉`);
+      } else {
+        alert("判定不正確，釋放搶答權，繼續遊戲！");
+      }
 
-  gameState.buzzerActive = false;
-  gameState.buzzerWinner = null;
-  broadcastState();
-  updateTeacherUI();
-}
-function showResultOverlay(passed) {
-  const old = document.getElementById('level-result-overlay');
-  if (old) old.remove();
+      gameState.buzzerActive = false;
+      gameState.buzzerWinner = null;
+      broadcastState();
+      updateTeacherUI();
+    }
 
-  const overlay = document.createElement('div');
-  overlay.id = 'level-result-overlay';
-  overlay.className = passed ? 'result-overlay success' : 'result-overlay fail';
-  overlay.innerHTML = passed
-    ? `<div class="result-box">
-         <div class="result-icon">🎉</div>
-         <h1>恭喜過關！</h1>
-         <p>你成功完成了這次的唐詩挑戰！</p>
-       </div>`
-    : `<div class="result-box">
-         <div class="result-icon">💥</div>
-         <h1>挑戰失敗</h1>
-         <p>別灰心，再試一次一定可以成功！</p>
-         <button class="btn btn-secondary" onclick="closeResultOverlay()">關閉</button>
-       </div>`;
-  document.body.appendChild(overlay);
+    // ==========================================
+    // 10. 過關／失敗訊息顯示（學生端）
+    // ==========================================
+    function showResultOverlay(passed) {
+      const old = document.getElementById('level-result-overlay');
+      if (old) old.remove();
 
-  if (passed) {
-    setTimeout(closeResultOverlay, 6000);
-  }
-}
+      const overlay = document.createElement('div');
+      overlay.id = 'level-result-overlay';
+      overlay.className = passed ? 'result-overlay success' : 'result-overlay fail';
+      overlay.innerHTML = passed
+        ? `<div class="result-box">
+             <div class="result-icon">🎉</div>
+             <h1>恭喜過關！</h1>
+             <p>你成功完成了這次的唐詩挑戰！</p>
+           </div>`
+        : `<div class="result-box">
+             <div class="result-icon">💥</div>
+             <h1>挑戰失敗</h1>
+             <p>別灰心，再試一次一定可以成功！</p>
+             <button class="btn btn-secondary" onclick="closeResultOverlay()">關閉</button>
+           </div>`;
+      document.body.appendChild(overlay);
 
-function closeResultOverlay() {
-  const el = document.getElementById('level-result-overlay');
-  if (el) el.remove();
-}
+      if (passed) {
+        setTimeout(closeResultOverlay, 6000);
+      }
+    }
 
+    function closeResultOverlay() {
+      const el = document.getElementById('level-result-overlay');
+      if (el) el.remove();
+    }
   </script>
 </body>
 </html>
